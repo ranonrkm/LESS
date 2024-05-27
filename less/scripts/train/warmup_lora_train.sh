@@ -1,4 +1,21 @@
 #!/bin/bash
+#SBATCH --no-requeue
+#SBATCH --account=fairaws-storygen
+#SBATCH --partition=storygen
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=32
+#SBATCH --job-name=ranajoy
+#SBATCH --time=12:00:00
+#SBATCH --gres=gpu:8
+#SBATCH --mem=64G
+#SBATCH --output=/data/home/beidic/ranajoy/submitviacron/data-log/less_warmup.out
+#SBATCH --error=/data/home/beidic/ranajoy/submitviacron/data-log/less_warmup.err
+
+source /data/home/beidic/.bashrc
+source /fsx-storygen/beidic/anaconda3/etc/profile.d/conda.sh
+conda activate ralm
+which python
 
 source less/scripts/train/base_training_args.sh
 
@@ -32,4 +49,4 @@ training_args="$base_training_args \
 --data_seed $data_seed \
 --train_files ${train_files[@]} 2>&1 | tee $output_dir/train.log"
 
-eval "$header" "$training_args"
+eval /opt/slurm/bin/srun "$header" "$training_args"
