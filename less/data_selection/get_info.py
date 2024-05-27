@@ -9,6 +9,7 @@ from copy import deepcopy
 from typing import Any
 
 import torch
+import torch.distributed as dist
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -18,6 +19,18 @@ from less.data_selection.get_training_dataset import get_training_dataset
 from less.data_selection.get_validation_dataset import (get_dataloader,
                                                         get_dataset)
 
+# if using torchrun, then we can do sharding
+ddp_rank = int(os.environ["RANK"])
+is_distributed = ddp_rank >= 0
+if is_distributed:
+    dist.init_process_group(backend="nccl")
+    ddp_local_rank = int(os.environ["LOCAL_RANK"])
+    ddp_world_size = int(os.environ["WORLD_SIZE"])
+    master_process = (
+        ddp_rank == 0
+    )
+else:
+    master_process = True
 
 def load_model(model_name_or_path: str,
                torch_dtype: Any = torch.bfloat16) -> Any:
@@ -142,6 +155,9 @@ else:
     assert args.train_file is not None
     dataset = get_training_dataset(
         args.train_file, tokenizer, args.max_length, sample_percentage=1.0)
+    if is_distributed:
+        dataset = dataset.shard(num_shards=ddp_world_size, index=ddp_rank)
+        print(f"Rank {ddp_rank} has {len(dataset)} samples")
     columns = deepcopy(dataset.column_names)
     columns.remove("input_ids")
     columns.remove("labels")
